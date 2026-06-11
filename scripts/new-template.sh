@@ -29,9 +29,9 @@ DISK_SIZE="40G"
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'
 CYAN='\033[0;36m'; BOLD='\033[1m'; NC='\033[0m'
 
-info()   { echo -e "  ${CYAN}→${NC} $*"; }
-ok()     { echo -e "  ${GREEN}✓${NC} $*"; }
-warn()   { echo -e "  ${YELLOW}!${NC} $*"; }
+info()   { echo -e "  ${CYAN}→${NC} $*" >&2; }
+ok()     { echo -e "  ${GREEN}✓${NC} $*" >&2; }
+warn()   { echo -e "  ${YELLOW}!${NC} $*" >&2; }
 err()    { echo -e "  ${RED}✗${NC} $*" >&2; }
 die()    { err "$*"; exit 1; }
 header() { echo -e "\n${BOLD}$*${NC}\n"; }
@@ -54,9 +54,16 @@ prompt_select() {
     local label="$1"; shift
     local options=("$@")
 
-    echo -e "  ${BOLD}${label}${NC}"
+    # Auto-select if only one option
+    if [ ${#options[@]} -eq 1 ]; then
+        ok "${label}: ${options[0]}" 
+        echo "${options[0]}"
+        return
+    fi
+
+    echo -e "  ${BOLD}${label}${NC}" >&2
     for i in "${!options[@]}"; do
-        echo "    $((i+1))) ${options[$i]}"
+        echo "    $((i+1))) ${options[$i]}" >&2
     done
 
     while true; do
