@@ -1,0 +1,23 @@
+#cloud-config
+users:
+  - name: ${USERNAME}
+    uid: 1000
+    groups:
+      - sudo
+      - docker
+    shell: /bin/bash
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    ssh_authorized_keys:
+      - ${USER_SSH_PUBKEY}
+
+  - name: ansible
+    system: true
+    shell: /bin/bash
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    ssh_authorized_keys:
+      - ${ANSIBLE_SSH_PUBKEY}
+
+package_update: true
+package_reboot_if_required: true
+packages:
+  - qemu-guest-agent
