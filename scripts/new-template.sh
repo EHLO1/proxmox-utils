@@ -19,7 +19,7 @@ set -eo pipefail
 # --- Configuration -----------------------------------------------------------
 # Raw content base URL for your git repo (no trailing slash)
 # Override via environment or edit this default
-CLOUD_CONFIG_REPO="${CLOUD_CONFIG_REPO:-https://}"
+CLOUD_CONFIG_REPO="${CLOUD_CONFIG_REPO:-https://raw.githubusercontent.com/EHLO1/proxmox-utils/main}"
 
 WORK_DIR="/tmp/pve-template-builder"
 SNIPPET_DIR="/var/lib/vz/snippets"
@@ -292,13 +292,13 @@ header "Cloud-Config"
 export USERNAME USER_SSH_PUBKEY ANSIBLE_SSH_PUBKEY TIMEZONE LOCALE
 ENVSUBST_VARS='${USERNAME} ${USER_SSH_PUBKEY} ${ANSIBLE_SSH_PUBKEY} ${TIMEZONE} ${LOCALE}'
 
-sudo mkdir -p "$SNIPPET_DIR"
+mkdir -p "$SNIPPET_DIR"
 
 if [ -n "$CLOUD_CONFIG_REPO" ]; then
     TEMPLATE_URL="$CLOUD_CONFIG_REPO/cloud-config/$PURPOSE.yml"
     info "Fetching template: cloud-config/$PURPOSE.yml"
 
-    if wget -qO- "$TEMPLATE_URL" | envsubst "$ENVSUBST_VARS" | sudo tee "$SNIPPET_DIR/$SNIPPET_NAME" >/dev/null; then
+    if wget -qO- "$TEMPLATE_URL" | envsubst "$ENVSUBST_VARS" | tee "$SNIPPET_DIR/$SNIPPET_NAME" >/dev/null; then
         ok "Template fetched and rendered"
     else
         die "Failed to fetch cloud-config/$PURPOSE.yml from repo"
@@ -307,7 +307,7 @@ else
     warn "CLOUD_CONFIG_REPO not set — generating inline (no purpose-specific groups)"
     info "Set CLOUD_CONFIG_REPO for purpose-specific templates from your git repo"
 
-    cat <<'TMPL' | envsubst "$ENVSUBST_VARS" | sudo tee "$SNIPPET_DIR/$SNIPPET_NAME" >/dev/null
+    cat <<'TMPL' | envsubst "$ENVSUBST_VARS" | tee "$SNIPPET_DIR/$SNIPPET_NAME" >/dev/null
 #cloud-config
 timezone: ${TIMEZONE}
 locale: ${LOCALE}
@@ -344,12 +344,12 @@ header "Building Template"
 
 if [ "$DESTROY_EXISTING" = true ]; then
     info "Destroying existing VMID $VMID..."
-    sudo qm destroy "$VMID" --purge 2>/dev/null || true
+    qm destroy "$VMID" --purge 2>/dev/null || true
     ok "Destroyed"
 fi
 
 info "Creating VM..."
-sudo qm create "$VMID" --name "$TEMPLATE_NAME" --ostype l26 \
+qm create "$VMID" --name "$TEMPLATE_NAME" --ostype l26 \
     --memory 1024 --balloon 0 \
     --agent 1 \
     --bios ovmf --machine q35 --efidisk0 "$STORAGE":0,pre-enrolled-keys=0 \
@@ -358,20 +358,20 @@ sudo qm create "$VMID" --name "$TEMPLATE_NAME" --ostype l26 \
     --net0 virtio,bridge=vmbr0
 
 info "Importing disk..."
-sudo qm importdisk "$VMID" "$RESIZED_IMG" "$STORAGE" &>/dev/null
+qm importdisk "$VMID" "$RESIZED_IMG" "$STORAGE" &>/dev/null
 
 info "Configuring hardware..."
-sudo qm set "$VMID" --scsihw virtio-scsi-pci --virtio0 "$STORAGE:vm-$VMID-disk-1,discard=on"
-sudo qm set "$VMID" --boot order=virtio0
-sudo qm set "$VMID" --scsi1 "$STORAGE:cloudinit"
+qm set "$VMID" --scsihw virtio-scsi-pci --virtio0 "$STORAGE:vm-$VMID-disk-1,discard=on"
+qm set "$VMID" --boot order=virtio0
+qm set "$VMID" --scsi1 "$STORAGE:cloudinit"
 
 info "Applying cloud-init config..."
-sudo qm set "$VMID" --cicustom "user=local:snippets/$SNIPPET_NAME"
-sudo qm set "$VMID" --tags "$DISTRO,$CODENAME,$PURPOSE,cloudinit"
-sudo qm set "$VMID" --ipconfig0 ip=dhcp
+qm set "$VMID" --cicustom "user=local:snippets/$SNIPPET_NAME"
+qm set "$VMID" --tags "$DISTRO,$CODENAME,$PURPOSE,cloudinit"
+qm set "$VMID" --ipconfig0 ip=dhcp
 
 info "Converting to template..."
-sudo qm template "$VMID"
+qm template "$VMID"
 
 header "Done"
 ok "$TEMPLATE_NAME (VMID: $VMID) is ready to clone"
