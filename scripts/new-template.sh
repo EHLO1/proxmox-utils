@@ -208,7 +208,7 @@ USERNAME=$(prompt_text "Primary username (uid 1000)" "")
 
 echo ""
 info "SSH public keys"
-USER_SSH_PUBKEY=$(read_pubkey "User public key" "$HOME/.ssh/id_ed25519.pub")
+USER_SSH_PUBKEY="$HOME/.ssh/id_ed25519.pub"
 ok "User key loaded"
 ANSIBLE_SSH_PUBKEY=$(read_pubkey "Ansible public key" "$HOME/.ssh/id_ansible.pub")
 ok "Ansible key loaded"
@@ -229,6 +229,7 @@ cat <<EOF
   Storage:       $STORAGE
   Disk:          $DISK_SIZE
   Timezone:      $TIMEZONE
+  Username:      $USERNAME
   Cloud-config:  $SNIPPET_NAME
   Tags:          $DISTRO, $CODENAME, $PURPOSE, cloudinit
 EOF
