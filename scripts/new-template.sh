@@ -363,7 +363,7 @@ qm set "$VMID" --boot order=virtio0
 qm set "$VMID" --scsi1 "$STORAGE:cloudinit"
 
 info "Applying cloud-init config..."
-qm set "$VMID" --cicustom "user=local:snippets/$SNIPPET_NAME"
+qm set "$VMID" --cicustom "vendor=local:snippets/$SNIPPET_NAME"
 qm set "$VMID" --tags "$DISTRO,$CODENAME,$PURPOSE,cloudinit"
 qm set "$VMID" --ciuser "$USERNAME"
 qm set "$VMID" --cipassword $(openssl passwd -6 $CLEARTEXT_PASSWORD)
