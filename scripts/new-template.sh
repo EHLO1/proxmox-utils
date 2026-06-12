@@ -25,7 +25,7 @@ WORK_DIR="/tmp/pve-template-builder"
 SNIPPET_DIR="/var/lib/vz/snippets"
 DISK_SIZE="40G"
 
-# --- Output Helpers -----------------------------------------------------------
+# Flair for Days 
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'
 CYAN='\033[0;36m'; BOLD='\033[1m'; NC='\033[0m'
 
@@ -36,8 +36,7 @@ err()    { echo -e "  ${RED}✗${NC} $*" >&2; }
 die()    { err "$*"; exit 1; }
 header() { echo -e "\n${BOLD}$*${NC}\n"; }
 
-# --- Prompt Helpers -----------------------------------------------------------
-
+# Helping Me Help You
 prompt_text() {
     local label="$1" default="$2" result
     if [ -n "$default" ]; then
@@ -106,7 +105,7 @@ read_pubkey() {
     echo "$key"
 }
 
-# --- Dependency Check ---------------------------------------------------------
+# Deputized
 check_deps() {
     local missing=()
     for cmd in wget qm pvesm qemu-img envsubst sha256sum; do
@@ -118,7 +117,7 @@ check_deps() {
     fi
 }
 
-# --- Help ---------------------------------------------------------------------
+# Help
 if [[ "${1:-}" =~ ^(-h|--help)$ ]]; then
     cat <<'USAGE'
 Proxmox VM Template Builder
@@ -144,7 +143,7 @@ check_deps
 
 header "═══ Proxmox VM Template Builder ═══"
 
-# --- Distribution & Release ---------------------------------------------------
+# Choose a Distro and Codename or Version
 DISTRO=$(prompt_select "Distribution" "ubuntu")
 
 case "$DISTRO" in
@@ -155,14 +154,13 @@ case "$DISTRO" in
             "jammy (22.04 LTS)")
         CODENAME="${CODENAME%% *}"
         ;;
-    # Future distros:
     # debian)
     #     CODENAME=$(prompt_select "Release" "trixie (13)" "bookworm (12)")
     #     CODENAME="${CODENAME%% *}"
     #     ;;
 esac
 
-# --- Purpose ------------------------------------------------------------------
+# It's 42
 while true; do
     PURPOSE=$(prompt_text "Purpose (e.g. docker, standard, k8s)" "docker")
     if [[ ! "$PURPOSE" =~ ^[a-z0-9]+$ ]]; then
@@ -175,7 +173,7 @@ while true; do
     break
 done
 
-# --- VM Configuration ---------------------------------------------------------
+# VMID, Storage
 header "VM Configuration"
 
 DESTROY_EXISTING=false
@@ -203,7 +201,7 @@ mapfile -t STORAGES < <(pvesm status --content images 2>/dev/null | awk 'NR>1 &&
 [ ${#STORAGES[@]} -eq 0 ] && die "No active storage targets found with 'images' content type"
 STORAGE=$(prompt_select "Storage target" "${STORAGES[@]}")
 
-# --- Cloud-Init Configuration ------------------------------------------------
+# Cloud-Init is a Bear
 header "Cloud-Init"
 
 USERNAME=$(prompt_text "Primary username (uid 1000)" "")
@@ -220,7 +218,7 @@ LOCALE="${LANG:-en_US.UTF-8}"
 ok "Timezone: $TIMEZONE (from host)"
 ok "Locale:   $LOCALE (from host)"
 
-# --- Summary & Confirm -------------------------------------------------------
+# LGTM
 TEMPLATE_NAME="$DISTRO-$CODENAME-$PURPOSE-template"
 SNIPPET_NAME="$DISTRO-$CODENAME-$PURPOSE.yml"
 
@@ -230,7 +228,6 @@ cat <<EOF
   VMID:          $VMID
   Storage:       $STORAGE
   Disk:          $DISK_SIZE
-  Username:      $USERNAME
   Timezone:      $TIMEZONE
   Cloud-config:  $SNIPPET_NAME
   Tags:          $DISTRO, $CODENAME, $PURPOSE, cloudinit
@@ -238,7 +235,7 @@ EOF
 echo ""
 prompt_confirm "Proceed?" || die "Aborted"
 
-# --- Download Cloud Image -----------------------------------------------------
+# If this were AC/DC, there'd be thunder
 header "Cloud Image"
 
 mkdir -p "$WORK_DIR"
@@ -249,7 +246,7 @@ case "$DISTRO" in
         IMG="${CODENAME}-server-cloudimg-amd64.img"
         BASE_URL="https://cloud-images.ubuntu.com/${CODENAME}/current"
         ;;
-    # Future distros: add image URL patterns here
+    # Future distros. Maybe one day.
     *)
         die "Cloud image support for '$DISTRO' is not yet implemented"
         ;;
@@ -293,7 +290,7 @@ cp "$IMG" "$RESIZED_IMG"
 qemu-img resize "$RESIZED_IMG" "$DISK_SIZE" &>/dev/null
 ok "Image resized"
 
-# --- Cloud-Config -------------------------------------------------------------
+# Technically smoke rings are
 header "Cloud-Config"
 
 export USERNAME USER_SSH_PUBKEY ANSIBLE_SSH_PUBKEY TIMEZONE LOCALE
@@ -311,8 +308,8 @@ if [ -n "$CLOUD_CONFIG_REPO" ]; then
         die "Failed to fetch cloud-config/$PURPOSE.yml from repo"
     fi
 else
-    warn "CLOUD_CONFIG_REPO not set — generating inline (no purpose-specific groups)"
-    info "Set CLOUD_CONFIG_REPO for purpose-specific templates from your git repo"
+    warn "CLOUD_CONFIG_REPO not set: Generating generic inline..."
+    info "Set CLOUD_CONFIG_REPO if you'd rather use your own template... with purpose... and gusto"
 
     cat <<'TMPL' | envsubst "$ENVSUBST_VARS" | tee "$SNIPPET_DIR/$SNIPPET_NAME" >/dev/null
 #cloud-config
@@ -320,15 +317,6 @@ timezone: ${TIMEZONE}
 locale: ${LOCALE}
 
 users:
-  - name: ${USERNAME}
-    uid: 1000
-    groups:
-      - sudo
-    shell: /bin/bash
-    sudo: ALL=(ALL) NOPASSWD:ALL
-    ssh_authorized_keys:
-      - ${USER_SSH_PUBKEY}
-
   - name: ansible
     system: true
     shell: /bin/bash
@@ -336,17 +324,18 @@ users:
     ssh_authorized_keys:
       - ${ANSIBLE_SSH_PUBKEY}
 
-package_update: true
-package_reboot_if_required: true
-packages:
-  - qemu-guest-agent
+runcmd:
+  - apt-get update
+  - apt-get install -y qemu-guest-agent
+  - systemctl enable ssh
+  - reboot
 TMPL
     ok "Inline cloud-config generated"
 fi
 
 ok "Written to $SNIPPET_DIR/$SNIPPET_NAME"
 
-# --- Create VM ----------------------------------------------------------------
+# *Popsicle Sticks Not Included
 header "Building Template"
 
 if [ "$DESTROY_EXISTING" = true ]; then
@@ -357,7 +346,7 @@ fi
 
 info "Creating VM..."
 qm create "$VMID" --name "$TEMPLATE_NAME" --ostype l26 \
-    --memory 1024 --balloon 0 \
+    --memory 1024 \
     --agent 1 \
     --bios ovmf --machine q35 --efidisk0 "$STORAGE":0,pre-enrolled-keys=0 \
     --cpu host --socket 1 --cores 1 \
@@ -375,6 +364,9 @@ qm set "$VMID" --scsi1 "$STORAGE:cloudinit"
 info "Applying cloud-init config..."
 qm set "$VMID" --cicustom "user=local:snippets/$SNIPPET_NAME"
 qm set "$VMID" --tags "$DISTRO,$CODENAME,$PURPOSE,cloudinit"
+qm set "$VMID" --ciuser "$USERNAME"
+qm set "$VMID" --cipassword $(openssl passwd -6 $CLEARTEXT_PASSWORD)
+qm set "$VMID" --sshkeys "$USER_SSH_PUBKEY"
 qm set "$VMID" --ipconfig0 ip=dhcp
 
 info "Converting to template..."
